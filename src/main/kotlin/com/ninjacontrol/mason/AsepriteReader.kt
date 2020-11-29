@@ -1,5 +1,7 @@
 package com.ninjacontrol.mason
 
+import java.io.File
+
 /*
 ## Types
 
@@ -64,39 +66,69 @@ BYTE[84]    For future (set to zero)
 @ExperimentalUnsignedTypes
 data class AsepriteHeader(
         // Header
-        private val size: aseDword,
-        private val frames: aseWord,
-        private val width: aseWord,
-        private val height: aseWord,
-        private val colorDepth: aseWord,
-        private val flags: aseDword,
-        private val speed: aseWord,
-        private val transparentIndex: aseByte,
-        private val numColors: aseWord,
-        private val pixelWidth: aseByte,
-        private val pixelHeight: aseByte,
-        private val gridXPosition: aseShort,
-        private val gridYPosition: aseShort,
-        private val gridWith: aseWord,
-        private val gridHeight: aseWord
+        val size: aseDword,
+        val frames: aseWord,
+        val width: aseWord,
+        val height: aseWord,
+        val colorDepth: aseWord,
+        val flags: aseDword,
+        val speed: aseWord,
+        val transparentIndex: aseByte,
+        val numColors: aseWord,
+        val pixelWidth: aseByte,
+        val pixelHeight: aseByte,
+        val gridXPosition: aseShort,
+        val gridYPosition: aseShort,
+        val gridWith: aseWord,
+        val gridHeight: aseWord
 )
 
+@ExperimentalUnsignedTypes
 data class AsepriteFile(
         private val header: AsepriteHeader
 )
 
+@ExperimentalUnsignedTypes
 class AsepriteReader {
 
-    // fun read( file: File) : AsepriteFile {
+    private val magicNumber: UShort = 42464u
 
-    // file.read
-    // val buffer : ByteBuffer =
+    internal fun getHeader(data: Data): AsepriteHeader {
+        val size: aseDword = data.getDword()
+        val magic: aseWord = data.getWord()
+        unless(magic == magicNumber) { throw ReaderException("Unrecognized file") }
+        val frames: aseWord = data.getWord()
+        val width: aseWord = data.getWord()
+        val height: aseWord = data.getWord()
+        val colorDepth: aseWord = data.getWord()
+        val flags: aseDword = data.getDword()
+        val speed: aseWord = data.getWord()
+        data.skipDword()
+        data.skipDword()
+        val transparentIndex: aseByte = data.getByte()
+        data.skipBytes(3)
+        val numColors: aseWord = data.getWord()
+        val pixelWidth: aseByte = data.getByte()
+        val pixelHeight: aseByte = data.getByte()
+        val gridXPosition: aseShort = data.getShort()
+        val gridYPosition: aseShort = data.getShort()
+        val gridWith: aseWord = data.getWord()
+        val gridHeight: aseWord = data.getWord()
+        data.skipBytes(84)
 
-    // }
+        return AsepriteHeader(size, frames, width, height, colorDepth, flags, speed, transparentIndex, numColors, pixelWidth, pixelHeight, gridXPosition, gridYPosition, gridWith, gridHeight)
+    }
 
-    // private fun readHeader(file: File) : AsepriteHeader =
-    // file.read
+    fun read(file: File): AsepriteFile {
+        unless(file.exists() && file.canRead()) { throw ReaderException("Could not read file ${file.name}") }
+        val data = Data(file.readBytes())
+        return AsepriteFile(header = getHeader(data))
+    }
+
+
 }
+
+class ReaderException(message: String) : Throwable(message)
 
 @ExperimentalUnsignedTypes
 class Data(private val buffer: ByteArray) {
@@ -110,20 +142,28 @@ class Data(private val buffer: ByteArray) {
     }
 
     fun getByte(): aseByte = buffer[index++].toUByte()
+    fun skipByte() = skip()
     fun getBytes(n: Int): UByteArray {
         val value = buffer.sliceArray(index..index + (n - 1)).asUByteArray()
         advance(n)
         return value
     }
 
+    fun skipBytes(n: Int) = skip(n)
+    private fun skip(n: Int = 1) {
+        index += n
+    }
+
     fun getWord(): aseWord {
-        val value: aseWord = ((buffer[index].toUInt() shl 8) + buffer[index + 1].toUByte()).toUShort()
+        val value: aseWord = ((buffer[index + 1].toUInt() shl 8) + buffer[index].toUByte()).toUShort()
         advance(2)
         return value
     }
 
+    fun skipWord() = skip(2)
+
     fun getShort(): aseShort {
-        val value: aseShort = ((buffer[index].toUInt() shl 8) + buffer[index + 1].toUByte()).toShort()
+        val value: aseShort = ((buffer[index + 1].toUInt() shl 8) + buffer[index].toUByte()).toShort()
         advance(2)
         return value
     }
@@ -131,8 +171,10 @@ class Data(private val buffer: ByteArray) {
     fun getDword(): aseDword {
         val valueHigh = getWord()
         val valueLow = getWord()
-        return ((valueHigh.toUInt() shl 16) + valueLow.toUInt())
+        return ((valueLow.toUInt() shl 16) + valueHigh.toUInt())
     }
+
+    fun skipDword() = skip(4)
 
     fun getLong(): aseLong = getDword().toInt()
     fun getString(): String {
@@ -154,3 +196,7 @@ class Data(private val buffer: ByteArray) {
 
 data class RGBAPixel(val red: aseByte, val green: aseByte, val blue: aseByte, val alpha: aseByte)
 data class GrayscalePixel(val value: aseByte, val alpha: aseByte)
+
+fun unless(condition: Boolean, block: () -> Unit) {
+    if (!condition) block()
+}
