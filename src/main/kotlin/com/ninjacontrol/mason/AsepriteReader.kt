@@ -1,6 +1,9 @@
 package com.ninjacontrol.mason
 
 import java.io.File
+import java.util.*
+import kotlin.collections.ArrayList
+
 
 /*
 ## Types
@@ -29,6 +32,7 @@ typealias aseShort = Short
 @ExperimentalUnsignedTypes
 typealias aseDword = UInt
 typealias aseLong = Int
+typealias aseByteArray = UByteArray
 
 /*
 ## Header
@@ -128,6 +132,228 @@ class AsepriteReader {
 
 }
 
+@ExperimentalUnsignedTypes
+enum class ChunkType(val value: aseWord) {
+    OldPalette(0x0004U),
+    OldPalette2(0x0011U),
+    Layer(0x02004U),
+    Cel(0x02005U),
+    CelExtra(0x02006U),
+    ColorProfile(0x02007U),
+    Mask(0x02016U), // Deprecated
+    Path(0x02017U),
+    Tags(0x02018U),
+    Palette(0x02019U),
+    UserData(0x02020U),
+    Slice(0x02022U);
+
+    companion object {
+        fun fromWord(value: aseWord) = ChunkType.values().first { it.value == value }
+    }
+}
+
+
+sealed class Chunk {
+    abstract val size: aseDword
+    val id: String = UUID.randomUUID().toString()
+    abstract val index: Int
+}
+
+@ExperimentalUnsignedTypes
+private class XOldPaletteChunk(override val index: Int, override val size: aseDword, private val data: Data) : Chunk() {
+    val packets: List<Packet>
+
+    init {
+        val numPackets = data.getWord().toInt()
+        packets = ArrayList(numPackets)
+        for (i in 0 until numPackets) {
+            val skipEntries = data.getByte()
+            val numColors = data.getByte()
+            val adjustedNumColors: Int = if (numColors.toInt() == 0) 256 else numColors.toInt()
+            val colors = ArrayList<Color>(adjustedNumColors)
+            for (j in 0 until adjustedNumColors) {
+                colors[j] = Color(red = data.getByte(), green = data.getByte(), blue = data.getByte())
+            }
+            packets[i] = Packet(skipEntries, colors)
+        }
+    }
+}
+
+// Palette Chunks
+
+@ExperimentalUnsignedTypes
+data class Color(val red: aseByte, val green: aseByte, val blue: aseByte)
+
+@ExperimentalUnsignedTypes
+data class Packet(val skipEntries: aseByte, val colors: List<Color>)
+
+data class OldPaletteChunk(override val index: Int,
+                           override val size: aseDword,
+                           val packets: List<Packet>) : Chunk()
+
+fun getOldPaletteChunk(index: Int, size: aseDword, data: Data): OldPaletteChunk {
+    val numPackets = data.getWord().toInt()
+    val packets = ArrayList<Packet>(numPackets)
+    for (i in 0 until numPackets) {
+        val skipEntries = data.getByte()
+        val numColors = data.getByte()
+        val adjustedNumColors: Int = if (numColors.toInt() == 0) 256 else numColors.toInt()
+        val colors = ArrayList<Color>(adjustedNumColors)
+        for (j in 0 until adjustedNumColors) {
+            colors[j] = Color(red = data.getByte(), green = data.getByte(), blue = data.getByte())
+        }
+        packets[i] = Packet(skipEntries, colors)
+    }
+    return OldPaletteChunk(index, size, packets)
+}
+
+enum class LayerFlags(val value: aseWord) {
+    Visible(1U),
+    Editable(2U),
+    LockMovement(4U),
+    Background(8U),
+    PreferLinkedCels(16U),
+    DisplayLayerGroupCollapsed(32U),
+    ReferenceLayer(64U)
+}
+
+enum class BlendMode(val value: aseWord) {
+    Normal(0U),
+    Multiply(1U),
+    Screen(2U),
+    Overlay(3U),
+    Darken(4U),
+    Lighten(5U),
+    ColorDodge(6U),
+    ColorBurn(7U),
+    HardLight(8U),
+    SoftLight(9U),
+    Difference(10U),
+    Exclusion(11U),
+    Hue(12U),
+    Saturation(13U),
+    Color(14U),
+    Luminosity(15U),
+    Addition(16U),
+    Subtract(17U),
+    Divide(18U);
+
+    companion object {
+        fun fromWord(value: aseWord) = BlendMode.values().first { it.value == value }
+    }
+}
+
+enum class LayerType(val value: aseWord) {
+    Normal(0U),
+    Group(1U);
+
+    companion object {
+        fun fromWord(value: aseWord) = LayerType.values().first { it.value == value }
+    }
+}
+
+private class LayerChunk(override val index: Int, override val size: aseDword, private val data: Data) : Chunk() {
+
+
+    val layerFlags: aseWord
+    private val layerTypeValue: aseWord
+
+    /**
+     *
+     *  The child level is used to show the relationship of this layer
+     *  with the last one read, for example:
+     *
+     *  Layer name and hierarchy    Child Level
+     *  -----------------------------------------------
+     *  - Background                0
+     *   `- Layer1                  1
+     *  - Foreground                0
+     *   |- My set1                 1
+     *   |  `- Layer                2
+     *   `- Layer3                  1
+     *
+     */
+    val childLevel: aseWord
+    val defaultLayerWidth: aseWord
+    val defaultLayerHeight: aseWord
+    private val blendModeValue: aseWord
+    val opacity: aseByte
+    val layerName: String
+
+    init {
+        layerFlags = data.getWord()
+        layerTypeValue = data.getWord()
+        childLevel = data.getWord()
+        defaultLayerWidth = data.getWord()
+        defaultLayerHeight = data.getWord()
+        blendModeValue = data.getWord()
+        opacity = data.getByte()
+        data.skipBytes(3)
+        layerName = data.getString()
+    }
+
+    val layerType: LayerType get() = LayerType.fromWord(layerTypeValue)
+    val blendMode: BlendMode get() = BlendMode.fromWord(blendModeValue)
+    fun isFlagSet(flag: LayerFlags): Boolean {
+        return (layerFlags.or(flag.value)) == flag.value
+    }
+
+}
+
+
+class CelChunk(override val index: Int, override val size: aseDword, private val data: Data) : Chunk() {
+    val layerIndex: aseWord
+    val xPosition: aseShort
+    val yPosition: aseShort
+    val opacityLevel: aseByte
+    val celTypeValue: aseWord
+    val width: aseWord?
+    val height: aseWord?
+    val linkedFrame: aseWord?
+    val rgbaPixels: Array<RGBAPixel>?
+    val grayscalePixels: Array<GrayscalePixel>?
+    val rawPixels: aseByteArray?
+
+}
+
+
+class Frame(private val data: Data) {
+    private val magicNumber: UShort = 0x0F1FAU
+
+    internal val numBytes: aseDword
+    val numChunks: aseDword
+    val frameDurationMs: aseWord
+    val chunks: List<Chunk>
+
+    init {
+
+        numBytes = data.getDword()
+        val magic = data.getWord()
+        unless(magic == magicNumber) { throw ReaderException("Invalid chunk type") }
+        val oldNumChunks = data.getWord()
+        frameDurationMs = data.getWord()
+        data.skipBytes(2)
+        val newNumChunks = data.getDword()
+        numChunks = if (newNumChunks.toInt() == 0) oldNumChunks.toUInt() else newNumChunks
+        chunks = ArrayList(numChunks.toInt())
+        for (i in 0 until numChunks.toInt()) {
+            val current = getChunk(i, data)
+            chunks[i] = current
+        }
+    }
+
+    internal fun getChunk(index: Int, data: Data): Chunk {
+        val size = data.getDword()
+        val type = data.getWord()
+        return when (val chunkType = ChunkType.fromWord(type)) {
+            ChunkType.OldPalette2, ChunkType.OldPalette -> OldPaletteChunk(index, size, data)
+            ChunkType.Layer -> LayerChunk(index, size, data)
+            else -> throw ReaderException("Chunk type '$chunkType' not implemented")
+        }
+    }
+
+}
+
 class ReaderException(message: String) : Throwable(message)
 
 @ExperimentalUnsignedTypes
@@ -193,6 +419,7 @@ class Data(private val buffer: ByteArray) {
         return GrayscalePixel(value = data[0], alpha = data[1])
     }
 }
+
 
 data class RGBAPixel(val red: aseByte, val green: aseByte, val blue: aseByte, val alpha: aseByte)
 data class GrayscalePixel(val value: aseByte, val alpha: aseByte)

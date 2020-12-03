@@ -19,6 +19,10 @@ dependencies {
 
 tasks.withType<KotlinCompile>() {
     kotlinOptions.jvmTarget = "11"
+    kotlinOptions.freeCompilerArgs = listOf(
+        "-Xuse-experimental=kotlin.ExperimentalUnsignedTypes",
+        "-XXLanguage:+InlineClasses"
+    )
 }
 application {
     mainClassName = "MainKt"
