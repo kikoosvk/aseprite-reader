@@ -24,7 +24,8 @@ open class DataTest {
         assertEquals(b4, data.getByte())
     }
 
-    private infix fun UByteArray.eq(that: UByteArray) = this.withIndex().all { v -> that[v.index] == v.value }
+    private infix fun UByteArray.eq(that: UByteArray) =
+        this.withIndex().all { v -> that[v.index] == v.value }
 
     @Test
     fun getBytes() {
@@ -76,8 +77,57 @@ open class DataTest {
     }
 
     @Test
+    fun getFixed() {
+        val data =
+            Data(ubyteArrayOf(0x78U, 0x56U, 0x34U, 0xF2U, 0x99U, 0x99U, 0x04U, 0x00U).toByteArray())
+        // 2's complement of 0x0F2345678 = 0xFFFFFFFF0DCBA988 -> -DCBA988 = -231451016
+        //4.6 * 65536 =  301465.6 ~ 301465 =  0x00049999.
+        val s1: Float = -3531.66223144f
+        val s2: Float = 4.59999f
+        assertEquals(s1, data.getFixed(), 0.00001f)
+        assertEquals(s2, data.getFixed(), 0.00001f)
+    }
+
+    @Test
     fun getString() {
-        val data = Data(ubyteArrayOf(0x021u, 0x000u /* length */, 0x064u, 0x065u, 0x074u, 0x074u, 0x061u, 0x020u, 0x0c3u, 0x0a4u, 0x072u, 0x020u, 0x065u, 0x074u, 0x074u, 0x020u, 0x074u, 0x065u, 0x073u, 0x074u, 0x021u, 0x022u, 0x026u, 0x026u, 0x026u, 0x026u, 0x0c3u, 0x085u, 0x0c3u, 0x084u, 0x0c3u, 0x096u, 0x0c2u, 0x0a7u).toByteArray())
+        val data = Data(
+            ubyteArrayOf(
+                0x021u,
+                0x000u /* length */,
+                0x064u,
+                0x065u,
+                0x074u,
+                0x074u,
+                0x061u,
+                0x020u,
+                0x0c3u,
+                0x0a4u,
+                0x072u,
+                0x020u,
+                0x065u,
+                0x074u,
+                0x074u,
+                0x020u,
+                0x074u,
+                0x065u,
+                0x073u,
+                0x074u,
+                0x021u,
+                0x022u,
+                0x026u,
+                0x026u,
+                0x026u,
+                0x026u,
+                0x0c3u,
+                0x085u,
+                0x0c3u,
+                0x084u,
+                0x0c3u,
+                0x096u,
+                0x0c2u,
+                0x0a7u
+            ).toByteArray()
+        )
         val str = "detta är ett test!\"&&&&ÅÄÖ§"
         assertEquals(str, data.getString())
     }
