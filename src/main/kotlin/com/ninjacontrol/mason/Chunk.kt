@@ -17,6 +17,14 @@ fun getChunk(index: Int, pixelType: PixelType, data: Data): Chunk {
         ChunkType.OldPalette2, ChunkType.OldPalette -> getOldPaletteChunk(index, size, data)
         ChunkType.Layer -> getLayerChunk(index, size, data)
         ChunkType.Cel -> getCelChunk(index, size, pixelType, data)
+        ChunkType.CelExtra -> getCelExtraChunk(index, size, data)
+        ChunkType.ColorProfile -> getColorProfileChunk(index, size, data)
+        ChunkType.Mask -> getMaskChunk(index, size, data) // Deprecated
+        ChunkType.Path -> getPathChunk(index, size) // Not used
+        ChunkType.Tags -> getTagsChunk(index, size, data)
+        ChunkType.Palette -> getPaletteChunk(index, size, data)
+        ChunkType.UserData -> getUserDataChunk(index, size, data)
+        ChunkType.Slice -> getSliceChunk(index, size, data)
         else -> throw ReaderException("Chunk type '$chunkType' not implemented")
     }
 }
@@ -77,10 +85,12 @@ fun getOldPaletteChunk(index: Int, size: aseDword, data: Data): OldPaletteChunk 
         val adjustedNumColors: Int = if (numColors.toInt() == 0) 256 else numColors.toInt()
         val colors = ArrayList<OldColor>(adjustedNumColors)
         for (j in 0 until adjustedNumColors) {
-            colors[j] =
+            colors.add(
+                j,
                 OldColor(red = data.getByte(), green = data.getByte(), blue = data.getByte())
+            )
         }
-        packets[i] = Packet(skipEntries, colors)
+        packets.add(i, Packet(skipEntries, colors))
     }
     return OldPaletteChunk(index, size, packets)
 }
@@ -102,7 +112,7 @@ fun getPaletteChunk(index: Int, size: aseDword, data: Data): PaletteChunk {
         val name: String? = if (flags == hasName) {
             data.getString()
         } else null
-        colors[i] = Color(red, green, blue, alpha, name)
+        colors.add(i, Color(red, green, blue, alpha, name))
     }
     return PaletteChunk(size, index, newPaletteSize, firstIndex, lastIndex, colors)
 }
@@ -189,7 +199,7 @@ fun getSliceChunk(index: Int, size: aseDword, data: Data): SliceChunk {
         if (flags.and(2U) == 2U) {
             pivot = Pivot(xPosition = data.getLong(), yPosition = data.getLong())
         }
-        sliceKeys[i] = SliceKey(frameNumber, xOrigin, yOrigin, width, height, center, pivot)
+        sliceKeys.add(i, SliceKey(frameNumber, xOrigin, yOrigin, width, height, center, pivot))
     }
     return SliceChunk(size, index, name, sliceKeys)
 }
@@ -526,15 +536,17 @@ fun getLinkedCelChunk(
 fun getCompressedCelChunk(
     index: Int,
     size: aseDword,
-    layerIndex: aseWord,
-    xPosition: aseShort,
-    yPosition: aseShort,
-    opacityLevel: aseByte,
+    layerIndex: aseWord, // 2 bytes
+    xPosition: aseShort, // 2 bytes
+    yPosition: aseShort, // 2 bytes
+    opacityLevel: aseByte, // 1 byte
+    // also, 2 + 7 bytes (cel type & skipped data) + 6 bytes chunk header
     data: Data
 ): CompressedCelChunk {
-    val width = data.getWord()
-    val height = data.getWord()
-    val pixels = data.getBytes(width.toInt() * height.toInt())
+    val width = data.getWord() // 2 bytes
+    val height = data.getWord() // 2 bytes  -> offset = 26 bytes
+    val offset = 26U
+    val pixels = data.getBytes((size - offset).toInt()) // Read to end of chunk
     return CompressedCelChunk(
         size,
         index,
@@ -720,7 +732,7 @@ fun getTagsChunk(index: Int, size: aseDword, data: Data): TagsChunk {
         val tagColor = TagColor(red = data.getByte(), green = data.getByte(), blue = data.getByte())
         data.skipByte()
         val tagName = data.getString()
-        tags[i] = Tag(fromFrame, toFrame, loopAnimationDirectionValue, tagColor, tagName)
+        tags.add(i, Tag(fromFrame, toFrame, loopAnimationDirectionValue, tagColor, tagName))
     }
     return TagsChunk(size, index, tags)
 }

@@ -23,8 +23,7 @@ fun getFrame(pixelType: PixelType, data: Data): Frame {
     val chunks = ArrayList<Chunk>(numChunks.toInt())
 
     for (i in 0 until numChunks.toInt()) {
-        val current = getChunk(i, pixelType, data)
-        chunks[i] = current
+        chunks.add(i, getChunk(i, pixelType, data))
     }
     return Frame(numBytes, numChunks, frameDurationMs, chunks)
 }

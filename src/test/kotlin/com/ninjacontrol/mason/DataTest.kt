@@ -92,8 +92,8 @@ open class DataTest {
     fun getString() {
         val data = Data(
             ubyteArrayOf(
-                0x021u,
-                0x000u /* length */,
+                0x020u,
+                0x000u, /* length */
                 0x064u,
                 0x065u,
                 0x074u,
@@ -125,7 +125,7 @@ open class DataTest {
                 0x0c3u,
                 0x096u,
                 0x0c2u,
-                0x0a7u
+                0x0a7u,
             ).toByteArray()
         )
         val str = "detta är ett test!\"&&&&ÅÄÖ§"

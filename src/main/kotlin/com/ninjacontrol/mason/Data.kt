@@ -51,7 +51,7 @@ class Data(private val buffer: ByteArray) {
     fun getLong(): aseLong = getDword().toInt()
     fun getString(): String {
         val length: aseWord = getWord()
-        val chars = getBytes(length.toInt() - 1)
+        val chars = getBytes(length.toInt())
         return chars.toByteArray().decodeToString()
     }
 
