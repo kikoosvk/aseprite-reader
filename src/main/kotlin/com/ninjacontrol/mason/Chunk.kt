@@ -739,9 +739,9 @@ fun getTagsChunk(index: Int, size: aseDword, data: Data): TagsChunk {
 
 // -- Util ---
 
-fun inflateChunk(chunk: CompressedCelChunk): UByteArray {
+fun CompressedCelChunk.getInflatedPixels(): UByteArray {
     val inflater = Inflater()
-    inflater.setInput(chunk.pixels.asByteArray())
+    inflater.setInput(pixels.asByteArray())
     val outputStream = ByteArrayOutputStream()
     val buffer = ByteArray(1024)
     while (!inflater.finished()) {

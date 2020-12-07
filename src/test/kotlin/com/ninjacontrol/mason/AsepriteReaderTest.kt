@@ -10,7 +10,8 @@ internal class AsepriteReaderTest {
 
     @Test
     fun `it should correctly read a file header`() {
-        val file: File = File(javaClass.classLoader.getResource("test1.aseprite").file)
+        val file: File =
+            File(javaClass.classLoader.getResource("rgba-compressed-cel.aseprite").file)
         val data = Data(file.readBytes())
         val header = AsepriteReader().getHeader(data)
         assertEquals(256, header.width.toInt())
@@ -32,7 +33,8 @@ internal class AsepriteReaderTest {
 
     @Test
     fun `it should correctly read frames`() {
-        val file: File = File(javaClass.classLoader.getResource("test1.aseprite").file)
+        val file: File =
+            File(javaClass.classLoader.getResource("rgba-compressed-cel.aseprite").file)
         val data = Data(file.readBytes())
         val header = AsepriteReader().getHeader(data)
         val frames = AsepriteReader().getFrames(header.frames.toInt(), header.pixelType, data)
@@ -50,9 +52,25 @@ internal class AsepriteReaderTest {
     }
 
     @Test
+    fun `it should be possible to inflate a compressed cel`() {
+        val file: File =
+            File(javaClass.classLoader.getResource("rgba-compressed-cel.aseprite").file)
+        val data = Data(file.readBytes())
+        val header = AsepriteReader().getHeader(data)
+        val frames = AsepriteReader().getFrames(header.frames.toInt(), header.pixelType, data)
+        assertTrue(frames[0].chunks[4] is CompressedCelChunk)
+        val compressedCelChunk = frames[0].chunks[4] as CompressedCelChunk
+        val inflated = compressedCelChunk.getInflatedPixels()
+        val inflated_size = compressedCelChunk.width.toInt() * compressedCelChunk.height.toInt() * 4
+        assertTrue(inflated.size == inflated_size)
+
+    }
+
+    @Test
     fun `it should correctly read a file`() {
 
-        val file: File = File(javaClass.classLoader.getResource("test1.aseprite").file)
+        val file: File =
+            File(javaClass.classLoader.getResource("rgba-compressed-cel.aseprite").file)
         val asepriteFile = AsepriteReader().read(file)
         assertNotNull(asepriteFile)
     }
