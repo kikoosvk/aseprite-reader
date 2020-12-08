@@ -74,4 +74,15 @@ internal class AsepriteReaderTest {
         val asepriteFile = AsepriteReader().read(file)
         assertNotNull(asepriteFile)
     }
+
+    @Test
+    fun `it should correctly read a file with 16BPP and multiple layers`() {
+
+        val file: File =
+            File(javaClass.classLoader.getResource("grayscale-multilayer-userdata.aseprite").file)
+        val asepriteFile = AsepriteReader().read(file)
+        val layerChunks = asepriteFile.frames[0].getChunksBy(type = LayerChunk::class)
+        assertEquals(7, layerChunks.size)
+        assertNotNull(asepriteFile)
+    }
 }
