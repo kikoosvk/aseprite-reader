@@ -1,11 +1,16 @@
 package com.ninjacontrol.mason
 
+import kotlin.reflect.KClass
+
 data class Frame(
     val numBytes: aseDword,
     val numChunks: aseDword,
     val frameDurationMs: aseWord,
     val chunks: List<Chunk>
 )
+
+inline fun <reified T : Chunk> Frame.getChunksBy(type: KClass<T>): List<T> =
+    chunks.filterIsInstance<T>()
 
 fun getFrame(pixelType: PixelType, data: Data): Frame {
 
