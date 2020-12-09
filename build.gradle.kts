@@ -2,10 +2,9 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm") version "1.4.10"
-    application
+    `java-library`
+    `maven-publish`
 }
-group = "com.ninjacontrol"
-version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
@@ -15,7 +14,23 @@ dependencies {
     testImplementation(kotlin("test-junit5"))
 }
 
-
+publishing {
+    publications {
+        register<MavenPublication>("gpr") {
+            from(components["java"])
+        }
+    }
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/karlll/asperite-reader")
+            credentials {
+                username = project.findProperty("gpr.user") as String? ?: System.getenv("USERNAME")
+                password = project.findProperty("gpr.key") as String? ?: System.getenv("TOKEN")
+            }
+        }
+    }
+}
 
 tasks.withType<KotlinCompile>() {
     kotlinOptions.jvmTarget = "11"
@@ -23,7 +38,4 @@ tasks.withType<KotlinCompile>() {
         "-Xuse-experimental=kotlin.ExperimentalUnsignedTypes",
         "-XXLanguage:+InlineClasses"
     )
-}
-application {
-    mainClassName = "MainKt"
 }
