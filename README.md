@@ -1,4 +1,4 @@
 # aseprite-reader
 
-A Kotlin library for reading [Asperite](https://www.aseprite.org/) files
+A Kotlin library for reading [Aseprite](https://www.aseprite.org/) files
 
