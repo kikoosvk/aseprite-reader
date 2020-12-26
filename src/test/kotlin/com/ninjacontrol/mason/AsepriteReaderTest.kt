@@ -85,4 +85,14 @@ internal class AsepriteReaderTest {
         assertEquals(7, layerChunks.size)
         assertNotNull(asepriteFile)
     }
+
+    @Test
+    fun `it should correctly read flags`() {
+
+        val file: File =
+            File(javaClass.classLoader.getResource("rgba-compressed-cel.aseprite").file)
+        val asepriteFile = AsepriteReader().read(file)
+        val layerChunk = asepriteFile.frames[0].chunks[3] as LayerChunk
+        assertTrue(layerChunk.isFlagSet(LayerFlags.Visible))
+    }
 }

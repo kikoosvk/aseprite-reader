@@ -267,7 +267,7 @@ data class LayerChunk(
     val layerType: LayerType get() = LayerType.fromWord(layerTypeValue)
     val blendMode: BlendMode get() = BlendMode.fromWord(blendModeValue)
     fun isFlagSet(flag: LayerFlags): Boolean {
-        return (layerFlags.or(flag.value)) == flag.value
+        return (layerFlags.and(flag.value)) == flag.value
     }
 }
 
