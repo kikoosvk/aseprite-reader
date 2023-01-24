@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
 package com.ninjacontrol.mason
 
 import java.io.ByteArrayOutputStream

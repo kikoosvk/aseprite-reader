@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
 package com.ninjacontrol.mason
 
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -95,4 +97,18 @@ internal class AsepriteReaderTest {
         val layerChunk = asepriteFile.frames[0].chunks[3] as LayerChunk
         assertTrue(layerChunk.isFlagSet(LayerFlags.Visible))
     }
+
+    @Test
+    fun `it should load mine file`() {
+        val file = File(javaClass.classLoader.getResource("mine-test.aseprite").file)
+        val asepriteFile = AsepriteReader().read(file)
+        val header = asepriteFile.header
+        val frames = asepriteFile.frames
+
+        val compressedCelChunk = frames[0].chunks[4] as CompressedCelChunk
+        val inflated = compressedCelChunk.getInflatedPixels()
+        val pixel = Color(inflated[0],inflated[1],inflated[2],inflated[3], null)
+        assertNotNull(inflated)
+    }
 }
+

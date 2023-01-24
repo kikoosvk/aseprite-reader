@@ -39,3 +39,8 @@ tasks.withType<KotlinCompile>() {
         "-XXLanguage:+InlineClasses"
     )
 }
+
+tasks.test {
+    // Use the built-in JUnit support of Gradle.
+    useJUnitPlatform()
+}

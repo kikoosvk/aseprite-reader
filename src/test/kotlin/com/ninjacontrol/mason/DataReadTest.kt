@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 @ExperimentalUnsignedTypes
-open class DataTest {
+open class DataReadTest {
 
     /*
     * NB: The Aseprite file format uses LE byte ordering
