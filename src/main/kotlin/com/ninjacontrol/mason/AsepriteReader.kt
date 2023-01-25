@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
 package com.ninjacontrol.mason
 
 import java.io.File
@@ -8,25 +10,6 @@ typealias aseShort = Short
 typealias aseDword = UInt
 typealias aseLong = Int
 typealias aseByteArray = UByteArray
-
-data class AsepriteHeader(
-    // Header
-    val size: aseDword,
-    val frames: aseWord,
-    val width: aseWord,
-    val height: aseWord,
-    val colorDepth: aseWord,
-    val flags: aseDword,
-    val speed: aseWord,
-    val transparentIndex: aseByte,
-    val numColors: aseWord,
-    val pixelWidth: aseByte,
-    val pixelHeight: aseByte,
-    val gridXPosition: aseShort,
-    val gridYPosition: aseShort,
-    val gridWith: aseWord,
-    val gridHeight: aseWord
-)
 
 val AsepriteHeader.pixelType: PixelType
     get() = when (colorDepth.toInt()) {

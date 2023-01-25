@@ -1,14 +1,10 @@
 package com.ninjacontrol.mason
 
 @ExperimentalUnsignedTypes
-class DataWriter() {
+class DataWriter(bufferSize: Int = 9999) {
     private var index: Int = 0
-    val buffer = ByteArray(9999)
+    val buffer = ByteArray(bufferSize)
     val size: Int get() = buffer.size
-
-    init {
-        // set buffer size
-    }
 
     private fun advance(amount: Int) {
         if (index + amount > size) {

@@ -25,7 +25,7 @@ internal class AsepriteReaderTest {
         assertEquals(1, header.pixelWidth.toInt())
         assertEquals(1, header.pixelHeight.toInt())
         assertEquals(1, header.flags.toInt())
-        assertEquals(16, header.gridWith.toInt())
+        assertEquals(16, header.gridWidth.toInt())
         assertEquals(16, header.gridHeight.toInt())
         assertEquals(0, header.gridXPosition.toInt())
         assertEquals(0, header.gridYPosition.toInt())
@@ -37,7 +37,8 @@ internal class AsepriteReaderTest {
     fun `it should correctly read frames`() {
         val file: File =
             File(javaClass.classLoader.getResource("rgba-compressed-cel.aseprite").file)
-        val data = Data(file.readBytes())
+        val dataBytes = file.readBytes()
+        val data = Data(dataBytes)
         val header = AsepriteReader().getHeader(data)
         val frames = AsepriteReader().getFrames(header.frames.toInt(), header.pixelType, data)
         assertEquals(1, frames.size)
@@ -109,6 +110,8 @@ internal class AsepriteReaderTest {
         val inflated = compressedCelChunk.getInflatedPixels()
         val pixel = Color(inflated[0],inflated[1],inflated[2],inflated[3], null)
         assertNotNull(inflated)
+        val writer = DataWriter(header.size.toInt())
+        header.write(writer)
     }
 }
 
