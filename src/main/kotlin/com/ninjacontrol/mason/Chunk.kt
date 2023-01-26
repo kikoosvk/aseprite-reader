@@ -3,13 +3,19 @@
 package com.ninjacontrol.mason
 
 import java.io.ByteArrayOutputStream
-import java.util.UUID
+import java.util.*
+import java.util.zip.Deflater
 import java.util.zip.Inflater
 
-sealed class Chunk {
+abstract class Chunk {
     abstract val size: aseDword
     val id: String = UUID.randomUUID().toString()
     abstract val index: Int
+    abstract fun write(writer: DataWriter)
+    fun writerChunkHeader(writer: DataWriter, type: ChunkType) {
+        writer.writeDword(size)
+        writer.writeWord(type.value)
+    }
 }
 
 fun getChunk(index: Int, pixelType: PixelType, data: Data): Chunk {
@@ -64,10 +70,21 @@ data class Color(
 
 data class Packet(val skipEntries: aseByte, val colors: List<OldColor>)
 data class OldPaletteChunk(
-    override val index: Int,
-    override val size: aseDword,
-    val packets: List<Packet>
-) : Chunk()
+    override val index: Int, override val size: aseDword, val packets: List<Packet>
+) : Chunk() {
+    override fun write(writer: DataWriter) {
+        super.writerChunkHeader(writer,  ChunkType.OldPalette)
+        writer.writeWord(packets.size.toUShort())
+        packets.forEach {
+            writer.writeByte(it.skipEntries)
+            val numOfColors = if (it.colors.size == 256) 0 else it.colors.size
+            writer.writeByte(numOfColors.toUByte())
+            it.colors.forEach { oldColor ->
+                writer.writeOldColor(oldColor)
+            }
+        }
+    }
+}
 
 data class PaletteChunk(
     override val size: aseDword,
@@ -76,7 +93,22 @@ data class PaletteChunk(
     val firstIndex: aseDword,
     val lastIndex: aseDword,
     val colors: List<Color>
-) : Chunk()
+) : Chunk() {
+    override fun write(writer: DataWriter) {
+        super.writerChunkHeader(writer,  ChunkType.Palette)
+        writer.writeDword(colors.size.toUInt())
+        writer.writeDword(0U)
+        writer.writeDword((colors.size - 1).toUInt())
+        writer.skipBytes(8)
+        colors.forEach {
+            if (it.name == null) writer.skipWord() else writer.writeWord(1U) // has name flag
+            writer.writeColor(it)
+            it.name?.let { name ->
+                writer.writeString(name)
+            }
+        }
+    }
+}
 
 fun getOldPaletteChunk(index: Int, size: aseDword, data: Data): OldPaletteChunk {
     val numPackets = data.getWord().toInt()
@@ -88,8 +120,7 @@ fun getOldPaletteChunk(index: Int, size: aseDword, data: Data): OldPaletteChunk 
         val colors = ArrayList<OldColor>(adjustedNumColors)
         for (j in 0 until adjustedNumColors) {
             colors.add(
-                j,
-                OldColor(red = data.getByte(), green = data.getByte(), blue = data.getByte())
+                j, OldColor(red = data.getByte(), green = data.getByte(), blue = data.getByte())
             )
         }
         packets.add(i, Packet(skipEntries, colors))
@@ -122,11 +153,12 @@ fun getPaletteChunk(index: Int, size: aseDword, data: Data): PaletteChunk {
 // -- User Data ---
 
 data class UserDataChunk(
-    override val size: aseDword,
-    override val index: Int,
-    val text: String?,
-    val color: Color?
-) : Chunk()
+    override val size: aseDword, override val index: Int, val text: String?, val color: Color?
+) : Chunk() {
+    override fun write(writer: DataWriter) {
+        TODO("Not yet implemented")
+    }
+}
 
 
 fun getUserDataChunk(index: Int, size: aseDword, data: Data): UserDataChunk {
@@ -174,7 +206,11 @@ data class SliceChunk(
     override val index: Int,
     val name: String,
     val sliceKeys: List<SliceKey>
-) : Chunk()
+) : Chunk() {
+    override fun write(writer: DataWriter) {
+        TODO("Not yet implemented")
+    }
+}
 
 fun getSliceChunk(index: Int, size: aseDword, data: Data): SliceChunk {
     val numSliceKeys = data.getDword()
@@ -271,6 +307,19 @@ data class LayerChunk(
     fun isFlagSet(flag: LayerFlags): Boolean {
         return (layerFlags.and(flag.value)) == flag.value
     }
+
+    override fun write(writer: DataWriter) {
+        super.writerChunkHeader(writer,  ChunkType.Layer)
+        writer.writeWord(layerFlags)
+        writer.writeWord(layerTypeValue)
+        writer.writeWord(childLevel)
+        writer.writeWord(defaultLayerWidth)
+        writer.writeWord(defaultLayerHeight)
+        writer.writeWord(blendModeValue)
+        writer.writeByte(opacity)
+        writer.skipBytes(3)
+        writer.writeString(layerName)
+    }
 }
 
 fun getLayerChunk(index: Int, size: aseDword, data: Data): LayerChunk {
@@ -305,6 +354,14 @@ sealed class CelChunk : Chunk() {
     abstract val xPosition: aseShort
     abstract val yPosition: aseShort
     abstract val opacityLevel: aseByte
+
+    override fun write(writer: DataWriter) {
+        super.writerChunkHeader(writer,  ChunkType.Cel)
+        writer.writeWord(layerIndex)
+        writer.writeShort(xPosition)
+        writer.writeShort(yPosition)
+        writer.writeByte(opacityLevel)
+    }
 }
 
 data class LinkedCelChunk(
@@ -315,7 +372,14 @@ data class LinkedCelChunk(
     override val yPosition: aseShort,
     override val opacityLevel: aseByte,
     val linkedFramePosition: aseWord,
-) : CelChunk()
+) : CelChunk() {
+    override fun write(writer: DataWriter) {
+        super.write(writer)
+        writer.writeWord(CelType.Linked.value)
+        writer.skipBytes(7)
+        writer.writeWord(linkedFramePosition)
+    }
+}
 
 data class RawRgbaCelChunk(
     override val size: aseDword,
@@ -328,6 +392,11 @@ data class RawRgbaCelChunk(
     val height: aseWord,
     val pixels: Array<RGBAPixel>
 ) : CelChunk() {
+    override fun write(writer: DataWriter) {
+        super.write(writer)
+        writer.writeWord(CelType.Raw.value)
+        writer.skipBytes(7)
+    }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -370,6 +439,9 @@ data class RawGrayscaleCelChunk(
     val height: aseWord,
     val pixels: Array<GrayscalePixel>
 ) : CelChunk() {
+    override fun write(writer: DataWriter) {
+        TODO("Not yet implemented")
+    }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -410,8 +482,17 @@ data class CompressedCelChunk(
     override val opacityLevel: aseByte,
     val width: aseWord,
     val height: aseWord,
-    val pixels: UByteArray
-) : CelChunk()
+    val compressedPixels: UByteArray
+) : CelChunk() {
+    override fun write(writer: DataWriter) {
+        super.write(writer)
+        writer.writeWord(CelType.Compressed.value)
+        writer.skipBytes(7)
+        writer.writeWord(width)
+        writer.writeWord(height)
+        writer.writeBytes(compressedPixels)
+    }
+}
 
 data class RawIndexedCelChunk(
     override val size: aseDword,
@@ -423,7 +504,11 @@ data class RawIndexedCelChunk(
     val width: aseWord,
     val height: aseWord,
     val pixels: UByteArray
-) : CelChunk()
+) : CelChunk() {
+    override fun write(writer: DataWriter) {
+        TODO("Not yet implemented")
+    }
+}
 
 data class CelExtraChunk(
     override val size: aseDword,
@@ -433,7 +518,11 @@ data class CelExtraChunk(
     val preciseYPosition: Float,
     val celWidth: Float,
     val celHeight: Float
-) : Chunk()
+) : Chunk() {
+    override fun write(writer: DataWriter) {
+        TODO("Not yet implemented")
+    }
+}
 
 enum class CelType(val value: aseWord) {
     Raw(0U),
@@ -479,6 +568,7 @@ fun getRawCel(
                 pixels = pixels
             )
         }
+
         PixelType.Grayscale -> {
             val width = data.getWord()
             val height = data.getWord()
@@ -497,6 +587,7 @@ fun getRawCel(
                 pixels = pixels
             )
         }
+
         PixelType.Indexed -> {
             val width = data.getWord()
             val height = data.getWord()
@@ -524,21 +615,18 @@ fun getLinkedCelChunk(
     yPosition: aseShort,
     opacityLevel: aseByte,
     data: Data
-): LinkedCelChunk =
-    LinkedCelChunk(
-        size,
-        index,
-        layerIndex,
-        xPosition,
-        yPosition,
-        opacityLevel,
-        linkedFramePosition = data.getWord()
-    )
+): LinkedCelChunk = LinkedCelChunk(
+    size,
+    index,
+    layerIndex,
+    xPosition,
+    yPosition,
+    opacityLevel,
+    linkedFramePosition = data.getWord()
+)
 
 fun getCompressedCelChunk(
-    index: Int,
-    size: aseDword,
-    layerIndex: aseWord, // 2 bytes
+    index: Int, size: aseDword, layerIndex: aseWord, // 2 bytes
     xPosition: aseShort, // 2 bytes
     yPosition: aseShort, // 2 bytes
     opacityLevel: aseByte, // 1 byte
@@ -550,15 +638,7 @@ fun getCompressedCelChunk(
     val offset = 26U
     val pixels = data.getBytes((size - offset).toInt()) // Read to end of chunk
     return CompressedCelChunk(
-        size,
-        index,
-        layerIndex,
-        xPosition,
-        yPosition,
-        opacityLevel,
-        width,
-        height,
-        pixels
+        size, index, layerIndex, xPosition, yPosition, opacityLevel, width, height, pixels
     )
 }
 
@@ -571,32 +651,15 @@ fun getCelChunk(index: Int, size: aseDword, pixelType: PixelType, data: Data): C
     data.skipBytes(7)
     return when (CelType.fromWord(celTypeValue)) {
         CelType.Raw -> getRawCel(
-            size,
-            index,
-            pixelType,
-            layerIndex,
-            xPosition,
-            yPosition,
-            opacityLevel,
-            data
+            size, index, pixelType, layerIndex, xPosition, yPosition, opacityLevel, data
         )
+
         CelType.Linked -> getLinkedCelChunk(
-            index,
-            size,
-            layerIndex,
-            xPosition,
-            yPosition,
-            opacityLevel,
-            data
+            index, size, layerIndex, xPosition, yPosition, opacityLevel, data
         )
+
         CelType.Compressed -> getCompressedCelChunk(
-            index,
-            size,
-            layerIndex,
-            xPosition,
-            yPosition,
-            opacityLevel,
-            data
+            index, size, layerIndex, xPosition, yPosition, opacityLevel, data
         )
     }
 }
@@ -609,13 +672,7 @@ fun getCelExtraChunk(index: Int, size: aseDword, data: Data): Chunk {
     val celHeight = data.getFixed()
     data.skipBytes(16)
     return CelExtraChunk(
-        size,
-        index,
-        flags,
-        preciseXPosition,
-        preciseYPosition,
-        celWidth,
-        celHeight
+        size, index, flags, preciseXPosition, preciseYPosition, celWidth, celHeight
     )
 }
 
@@ -629,12 +686,22 @@ data class ColorProfileChunk(
     val gamma: Float,
     val iccProfileData: aseByteArray?
 
-) : Chunk()
+) : Chunk() {
+    override fun write(writer: DataWriter) {
+        super.writerChunkHeader(writer,  ChunkType.ColorProfile)
+        writer.writeWord(typeValue)
+        writer.writeWord(flags)
+        writer.writeFixed(gamma)
+        writer.skipBytes(8)
+        iccProfileData?.let {
+            writer.writeDword(iccProfileData.size.toUInt())
+            writer.writeBytes(iccProfileData)
+        }
+    }
+}
 
 enum class ColorProfileType(val value: aseWord) {
-    NoProfile(0U),
-    sRGB(1U),
-    embeddedICC(2U);
+    NoProfile(0U), sRGB(1U), embeddedICC(2U);
 
     companion object {
         fun fromWord(value: aseWord) = values().first { it.value == value }
@@ -671,7 +738,11 @@ data class MaskChunk(
     val height: aseWord,
     val name: String,
     val bitMap: aseByteArray
-) : Chunk()
+) : Chunk() {
+    override fun write(writer: DataWriter) {
+        TODO("Not yet implemented")
+    }
+}
 
 fun getMaskChunk(index: Int, size: aseDword, data: Data): MaskChunk {
     val xPosition = data.getShort()
@@ -686,17 +757,23 @@ fun getMaskChunk(index: Int, size: aseDword, data: Data): MaskChunk {
 
 // -- Path Chunk (Not used) ---
 
-data class PatchChunk(override val size: aseDword, override val index: Int) : Chunk()
+data class PatchChunk(override val size: aseDword, override val index: Int) : Chunk() {
+    override fun write(writer: DataWriter) {
+        TODO("Not yet implemented")
+    }
+}
 
 fun getPathChunk(index: Int, size: aseDword) = PatchChunk(size, index)
 
 // -- Tags Chunk ---
 
 data class TagsChunk(
-    override val size: aseDword,
-    override val index: Int,
-    val tags: List<Tag>
-) : Chunk()
+    override val size: aseDword, override val index: Int, val tags: List<Tag>
+) : Chunk() {
+    override fun write(writer: DataWriter) {
+        TODO("Not yet implemented")
+    }
+}
 
 data class Tag(
     val fromFrame: aseWord,
@@ -713,9 +790,7 @@ val Tag.loopAnimationDirection: LoopAnimationDirection
 
 data class TagColor(val red: aseByte, val green: aseByte, val blue: aseByte)
 enum class LoopAnimationDirection(val value: aseByte) {
-    Forward(0U),
-    Reverse(1U),
-    PingPong(2U);
+    Forward(0U), Reverse(1U), PingPong(2U);
 
     companion object {
         fun fromByte(value: aseByte) = values().first { it.value == value }
@@ -743,11 +818,24 @@ fun getTagsChunk(index: Int, size: aseDword, data: Data): TagsChunk {
 
 fun CompressedCelChunk.getInflatedPixels(): UByteArray {
     val inflater = Inflater()
-    inflater.setInput(pixels.asByteArray())
+    inflater.setInput(compressedPixels.asByteArray())
     val outputStream = ByteArrayOutputStream()
     val buffer = ByteArray(1024)
     while (!inflater.finished()) {
         val count = inflater.inflate(buffer)
+        outputStream.write(buffer, 0, count)
+    }
+    outputStream.close()
+    return outputStream.toByteArray().toUByteArray()
+}
+
+fun CompressedCelChunk.DeflatePixels(rawPixels: UByteArray): UByteArray {
+    val deflater = Deflater()
+    deflater.setInput(rawPixels.toByteArray())
+    val outputStream = ByteArrayOutputStream()
+    val buffer = ByteArray(1024)
+    while (!deflater.finished()) {
+        val count = deflater.deflate(buffer)
         outputStream.write(buffer, 0, count)
     }
     outputStream.close()

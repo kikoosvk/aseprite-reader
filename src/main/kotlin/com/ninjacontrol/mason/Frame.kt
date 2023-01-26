@@ -3,20 +3,32 @@
 package com.ninjacontrol.mason
 
 import kotlin.reflect.KClass
+val magicNumber: UShort = 0x0F1FAU
 
 data class Frame(
     val numBytes: aseDword,
     val numChunks: aseDword,
     val frameDurationMs: aseWord,
     val chunks: List<Chunk>
-)
+) {
+    fun write(writer: DataWriter) {
+        writer.writeDword(numBytes)
+        writer.writeWord(magicNumber)
+        writer.writeWord(numChunks.toUShort())
+        writer.writeWord(frameDurationMs)
+        writer.skipBytes(2)
+        writer.writeDword(numChunks)
+        chunks.forEach {
+            it.write(writer)
+        }
+    }
+}
 
 inline fun <reified T : Chunk> Frame.getChunksBy(type: KClass<T>): List<T> =
     chunks.filterIsInstance<T>()
 
 fun getFrame(pixelType: PixelType, data: Data): Frame {
 
-    val magicNumber: UShort = 0x0F1FAU
     val numChunks: aseDword
 
     val numBytes = data.getDword()

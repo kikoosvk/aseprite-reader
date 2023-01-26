@@ -2,9 +2,7 @@
 
 package com.ninjacontrol.mason
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.io.File
 
@@ -108,10 +106,7 @@ internal class AsepriteReaderTest {
 
         val compressedCelChunk = frames[0].chunks[4] as CompressedCelChunk
         val inflated = compressedCelChunk.getInflatedPixels()
-        val pixel = Color(inflated[0],inflated[1],inflated[2],inflated[3], null)
         assertNotNull(inflated)
-        val writer = DataWriter(header.size.toInt())
-        header.write(writer)
     }
 }
 

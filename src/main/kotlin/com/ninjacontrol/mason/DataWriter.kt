@@ -83,11 +83,26 @@ class DataWriter(bufferSize: Int = 9999) {
         writeByte(alpha)
     }
 
+    fun writeColor(color: Color) {
+        val (red, green, blue, alpha) = color
+        writeByte(red)
+        writeByte(green)
+        writeByte(blue)
+        writeByte(alpha)
+    }
+
 
     fun writeGrayscalePixel(pixel: GrayscalePixel) {
         val (value, alpha) = pixel
         writeByte(value)
         writeByte(alpha)
+    }
+
+    fun writeOldColor(oldColor: OldColor) {
+        val (red, green, blue) = oldColor
+        writeByte(red)
+        writeByte(green)
+        writeByte(blue)
     }
 
 }
